@@ -4,10 +4,13 @@ import re
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem import RSLPStemmer
+import spacy
 
 nltk.download('stopwords')
 nltk.download('punkt')
 nltk.download('rslp')
+nlp = spacy.load('pt_core_news_sm')
+
 
 language = "portuguese"
 stopwords_portuguese = set(stopwords.words(language))
@@ -36,11 +39,21 @@ def tokenizar_texto_remove_stopwords(texto):
     print("Stopwords Removidas:", stopwords_removidas)
     return palavras_filtradas
 
-#metodo que lematiza as palavras
-def lematizar_texto(palavras):
+#metodo que lematizar e steemizar as palavras
+def steemizar_lematizar_texto(palavras):
     stemmer = RSLPStemmer()
-    palavras_lematizadas = [stemmer.stem(palavra) for palavra in palavras]
-    return palavras_lematizadas
+    palavras_stemmizadas_lematizadas = []
+
+    for palavra in palavras:
+        # Stemming
+        stem = stemmer.stem(palavra)
+
+        # Lematização
+        doc = nlp(palavra)
+        lema = doc[0].lemma_ if doc[0].lemma_ != '-PRON-' else palavra
+        palavras_stemmizadas_lematizadas.append((palavra, lema, stem))
+
+    return palavras_stemmizadas_lematizadas
 
 # Lista de arquivos PDF que vão ter suas palavras extraidas
 arquivos_pdf = ["A_Canção_dos_tamanquinhos_Cecília_Meireles.pdf", "A_Centopeia_Marina_Colasanti.pdf", "A_porta_Vinicius_de_Moraes.pdf", "Ao_pé_de_sua_criança_Pablo_Neruda.pdf", "As_borboletas_Vinicius_de_Moraes.pdf", "Convite_José_Paulo_Paes.pdf","Pontinho_de_Vista_Pedro_Bandeira.pdf"]
@@ -58,7 +71,7 @@ for arquivo_pdf in arquivos_pdf:
     tokens_sem_stopwords = tokenizar_texto_remove_stopwords(texto_pdf)
     
     # Envia para o metodo que lematiza as palavras
-    tokens_lematizados = lematizar_texto(tokens_sem_stopwords)
+    tokens_lematizados = steemizar_lematizar_texto(tokens_sem_stopwords)
 
     # Armazenar tokens e lematização no dicionário
     tokens_lematizados_por_documento[arquivo_pdf] = {
