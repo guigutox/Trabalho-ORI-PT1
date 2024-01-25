@@ -6,6 +6,9 @@ from nltk.corpus import stopwords
 from nltk.stem import RSLPStemmer
 import spacy
 from collections import Counter
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
 
 nltk.download('stopwords')
 nltk.download('punkt')
@@ -15,12 +18,12 @@ nlp = spacy.load('pt_core_news_sm')
 language = "portuguese"
 stopwords_portuguese = set(stopwords.words(language))
 new_stopwords = {'pra', 'troc', 'lá', 'tudo', 'entre', 'dos', 'ainda',
-                 'então', 'pouco', 'cada', '...', '—', ',', ':', '?', '!', 'oh'}
+                 'então', 'pouco', 'cada', '...', '—', ',', ':', '?', '!', 'oh', 
+                 'antes', 'cem', 'algum', 'então', 'outro', 'tanto', 'vamos', 'sempre', 'cada',
+                'todo', 'ia', 'manca', 'vivo', 'tudo'}
 stopwords_portuguese.update(new_stopwords)
 
-# extrai o texto do PDF retorna o texto
-
-
+# Extrai o texto do PDF e retorna o texto
 def extrair_texto_pdf(arquivo_pdf):
     doc = fitz.open(arquivo_pdf)
     texto = ""
@@ -31,9 +34,7 @@ def extrair_texto_pdf(arquivo_pdf):
 
     return texto
 
-# tokeniza o texto e extrai as stopwords
-
-
+# Tokeniza o texto e extrai as stopwords
 def tokenizar_texto_remove_stopwords(texto):
     palavras = word_tokenize(texto.lower())
     palavras = [re.sub(r'\W', '', palavra)
@@ -47,24 +48,85 @@ def tokenizar_texto_remove_stopwords(texto):
     print("Stopwords Removidas:", stopwords_removidas)
     return palavras_filtradas
 
-# metodo que lematiza e steemiza as palavras
-
-
-def steemizar_lematizar_texto(palavras):
+# Método que lematiza e stemiza as palavras, com exceções
+def steemizar_lematizar_texto(palavras, evitar_stemizacao, excecoes_stemming, excecoes_lematizacao):
     stemmer = RSLPStemmer()
     palavras_stemmizadas_lematizadas = []
 
     for palavra in palavras:
-        # Stemming
-        stem = stemmer.stem(palavra)
-
         # Lematização
         doc = nlp(palavra)
         lema = doc[0].lemma_ if doc[0].lemma_ != '-PRON-' else palavra
+
+        if lema.lower() in evitar_stemizacao:
+            stem = lema  # Mantém a palavra original
+        elif lema.lower() in excecoes_stemming:
+            stem = excecoes_stemming[lema.lower()]  # Usa a exceção de stemmização
+        else:
+            # Executa a stemização normalmente
+            stem = stemmer.stem(palavra)
+
+        if lema.lower() in excecoes_lematizacao:
+            lema = excecoes_lematizacao[lema.lower()]  # Usa a exceção de lematização
+
         palavras_stemmizadas_lematizadas.append((palavra, lema, stem))
 
     return palavras_stemmizadas_lematizadas
 
+# Lista de palavras a evitar a stemização
+palavras_a_evitar_stemizacao = ['azul', 'morta']
+
+# Lista de exceções para stemming
+excecoes_stemming = {
+    'tamanquinh': 'tamanc',
+    'entã': 'entao',
+    'pé': 'pe',
+    'pés': 'pe',
+    'piã': 'piao',
+    'águ': 'agua',
+    'maçã': 'maca',
+    'amarelinha': 'amarel',
+    'bonitinh': 'bonit',
+    'escuridã': 'escur',
+    'silênci': 'silenci',
+    'bichinh': 'bich',
+    'matér': 'mater',
+    'devagarinh': 'devag',
+    'menininh': 'menin',
+    'céu': 'ceu',
+    'chã': 'chao',
+    'grandã': 'grand',
+    'ligeirinh': 'ligeir',
+    'man':'manei',
+    'capitão':'capit',
+    'ir':'ir',
+    'vizinho':'vizi',
+    'ter':'ter',
+}
+
+# Lista de exceções para lematização
+excecoes_lematizacao = {
+    'ligeirinho':'ligeiro',
+    'tamanquinho':'tamanco',
+    'madrugar':'madruga',
+    'ideiar':'ideia',
+    'centopeiar':'centopeia',
+    'patar':'pato',
+    'fazer':'feito',
+    'abrar':'abrir',
+    'davagarinho':'devagar',
+    'menininho': 'menino',
+    'namorar':'namorado',
+    'aberta':'aberto',
+    'frutar': 'fruta',
+    'redondar':'redondo',
+    'condenar':'condenado',
+    'encerrar':'encerrado',
+    'amararelinha':'amarelo',
+    'bonitinha':'bonita',
+    'bolo':'bola',
+    'vir':'ver'
+}
 
 # Lista de arquivos PDF que vão ter suas palavras extraídas
 arquivos_pdf = ["A_Canção_dos_tamanquinhos_Cecília_Meireles.pdf", "A_Centopeia_Marina_Colasanti.pdf", "A_porta_Vinicius_de_Moraes.pdf",
@@ -89,7 +151,7 @@ for arquivo_pdf in arquivos_pdf:
     tokens_sem_stopwords = tokenizar_texto_remove_stopwords(texto_pdf)
 
     # Envia para o método que lematiza as palavras
-    tokens_lematizados = steemizar_lematizar_texto(tokens_sem_stopwords)
+    tokens_lematizados = steemizar_lematizar_texto(tokens_sem_stopwords, palavras_a_evitar_stemizacao, excecoes_stemming, excecoes_lematizacao)
 
     # Atualizar contagem no corpus
     palavras_no_corpus.update(tokens_lematizados)
@@ -106,55 +168,17 @@ for arquivo_pdf in arquivos_pdf:
     doc_id_counter += 1
 
 # Exibindo os resultados
-# ...
-
-# Exibindo os resultados
 for doc_id, dados in tokens_info_por_documento.items():
     print(f"ID {doc_id} - {dados['arquivo_pdf']}")
     print("   -> Tokens Sem Stopwords:")
-    # ...
-
     print()
 
-# Exibindo a frequência no corpus
 print("Frequência no Corpus:")
 for palavra, freq in palavras_no_corpus.items():
     documentos_com_palavra = []
 
-    for doc_id, dados in tokens_info_por_documento.items():
-        if palavra in dados['frequencia_no_documento']:
-            freq_no_documento = dados['frequencia_no_documento'][palavra]
-            documentos_com_palavra.append(f"{doc_id}/{freq_no_documento}")
-
-    if documentos_com_palavra:
-        documentos_str = ', '.join(documentos_com_palavra)
-        print(f"   -> {palavra} -> {documentos_str}")
-
-
-# Exibindo a frequência no corpus
-# print("Frequência no Corpus:")
-# for palavra, freq in palavras_no_corpus.items():
- #   print(f"   -> {palavra} -> {', '.join([f'{doc_id}/{freq}' for doc_id, freq in dados['frequencia_no_documento'].ite()])}")
-        
-
-
-# Nome do arquivo PDF de saída
-output_pdf = "output_resultados.pdf"
-
-# Criação do documento PDF
-pdf_doc = fitz.open()
-
-# Exibindo a frequência no corpus
-page = pdf_doc.new_page(width=500, height=700)  # Adiciona uma nova página
-
-# Definindo a posição inicial y
-y_position = 50
-
-page.insert_text((50, y_position), "Frequência no Corpus:\n")
-y_position += 20  # Ajuste conforme necessário
-
-for palavra, freq in palavras_no_corpus.items():
-    documentos_com_palavra = []
+    # Soma total da frequência da palavra no corpus
+    freq_total_corpus = sum(dados['frequencia_no_documento'][palavra] for dados in tokens_info_por_documento.values() if palavra in dados['frequencia_no_documento'])
 
     for doc_id, dados in tokens_info_por_documento.items():
         if palavra in dados['frequencia_no_documento']:
@@ -163,14 +187,57 @@ for palavra, freq in palavras_no_corpus.items():
 
     if documentos_com_palavra:
         documentos_str = ', '.join(documentos_com_palavra)
+        print(f"   -> {palavra} -> {documentos_str} -> Total no Corpus: {freq_total_corpus}")
 
-        # Verifica se é necessário adicionar uma nova página
-        if y_position > 650:
-            page = pdf_doc.new_page(width=500, height=700)
-            y_position = 50
 
-        page.insert_text((50, y_position), f"   -> {palavra} -> {documentos_str}\n")
-        y_position += 20  # Ajuste conforme necessário
 
-# Salvar o documento PDF
-pdf_doc.save(output_pdf)
+
+
+# Função para gerar o PDF com os resultados
+def gerar_pdf(tokens_info_por_documento, palavras_no_corpus, output_file):
+    # Inicializa o objeto canvas para gerar o PDF
+    c = canvas.Canvas(output_file, pagesize=letter)
+    width, height = letter
+
+    # Define o tamanho da fonte
+    c.setFont("Helvetica", 12)
+
+    # Adiciona manualmente os IDs e nomes dos documentos na primeira página
+    documentos = {
+        1: "A_Cancao_dos_tamanquinhos_Cecilia_Meireles.pdf",
+        2: "A_Centopeia_Marina_Colasanti.pdf",
+        3: "A_porta_Vinicius_de_Moraes.pdf",
+        4: "Ao_pe_de_sua_crianca_Pablo_Neruda.pdf",
+        5: "As_borboletas_Vinicius_de_Moraes.pdf",
+        6: "Convite_Jose_Paulo_Paes.pdf",
+        7: "Pontinho_de_Vista_Pedro_Bandeira.pdf"
+    }
+
+    y_offset = height - 50  # Posição vertical inicial
+    for doc_id, arquivo_pdf in documentos.items():
+        c.drawString(100, y_offset, f"ID {doc_id} - {arquivo_pdf}")
+        y_offset -= 15  # Move para a próxima linha
+
+    # Pula para a próxima página
+    c.showPage()
+
+    # Adiciona a frequência no corpus na nova página
+    c.drawString(100, height - 50, "Frequência no Corpus:")
+    y_offset = height - 70  # Posição vertical inicial
+
+    for palavra, freq in palavras_no_corpus.items():
+        freq_total_corpus = sum(1 for dados in tokens_info_por_documento.values() if palavra in dados['frequencia_no_documento'])
+        if freq_total_corpus > 0:
+            documentos_str = ', '.join(f"{doc_id}/{dados['frequencia_no_documento'].get(palavra, 0)}" for doc_id, dados in tokens_info_por_documento.items() if palavra in dados['frequencia_no_documento'])
+            c.drawString(100, y_offset, f"{palavra}/{freq_total_corpus} -> {documentos_str}")
+            y_offset -= 15  # Move para a próxima linha
+            if y_offset < 50:
+                c.showPage()  # Nova página se não houver espaço suficiente
+                c.drawString(100, height - 50, "Frequência no Corpus:")
+                y_offset = height - 70  # Redefine a posição vertical
+
+    # Salva o PDF
+    c.save()
+
+# Chama a função para gerar o PDF
+gerar_pdf(tokens_info_por_documento, palavras_no_corpus, "resultados.pdf")
